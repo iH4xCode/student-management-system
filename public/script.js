@@ -1,8 +1,4 @@
-// Use relative API base for production, localhost for development
-const API_BASE = window.location.hostname === 'localhost' 
-  ? 'http://localhost:3000/api' 
-  : '/api';
-
+const API_BASE = 'http://localhost:3000/api';
 let currentStudents = [];
 let currentSubjects = [];
 
@@ -256,36 +252,92 @@ async function unenrollStudent(enrollmentId) {
 
 async function viewStudentDetails(studentId) {
     try {
-        const [student, grades] = await Promise.all([
+        // Get student basic info and grades
+        const [studentResponse, gradesResponse] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
         ]);
         
-        // Get student's enrollment details
-        const studentDetails = await apiRequest(`/students/${studentId}`);
+        const student = studentResponse;
+        const grades = gradesResponse;
+        
+        console.log('Student data:', student);
+        console.log('Grades data:', grades);
         
         // Group grades by subject, but include all enrolled subjects
         const subjectData = {};
         
         // First, add all enrolled subjects (even without grades)
-        studentDetails.subjects.forEach(subject => {
-            subjectData[`${subject.code} - ${subject.name}`] = {
-                code: subject.code,
-                name: subject.name,
-                credits: subject.credits,
-                activities: [],
-                quizzes: [],
-                exams: []
-            };
-        });
+        if (student.subjects && student.subjects.length > 0) {
+            student.subjects.forEach(subject => {
+                const key = `${subject.code} - ${subject.name}`;
+                subjectData[key] = {
+                    code: subject.code,
+                    name: subject.name,
+                    credits: subject.credits,
+                    activities: [],
+                    quizzes: [],
+                    exams: []
+                };
+            });
+        }
         
         // Then add grades to existing subjects
-        grades.forEach(grade => {
-            const key = `${grade.subject_code} - ${grade.subject_name}`;
-            if (subjectData[key]) {
-                subjectData[key][grade.grade_type + 's'].push(grade);
-            }
-        });
+        if (grades && grades.length > 0) {
+            grades.forEach(grade => {
+                console.log('Processing grade:', grade);
+                
+                // Build the key exactly as we did above
+                const key = `${grade.subject_code} - ${grade.subject_name}`;
+                
+                // Check if this subject exists in our enrolled subjects
+                if (subjectData[key]) {
+                    // Validate grade_type and build array name
+                    const gradeType = grade.grade_type;
+                    let arrayName;
+                    
+                    if (gradeType === 'activity') {
+                        arrayName = 'activities';
+                    } else if (gradeType === 'quiz') {
+                        arrayName = 'quizzes';
+                    } else if (gradeType === 'exam') {
+                        arrayName = 'exams';
+                    } else {
+                        console.warn('Unknown grade type:', gradeType);
+                        return; // Skip this grade
+                    }
+                    
+                    // Add grade to the appropriate array
+                    subjectData[key][arrayName].push(grade);
+                } else {
+                    // Grade exists for a subject the student is no longer enrolled in
+                    console.warn('Grade found for unenrolled subject:', key);
+                    
+                    // Create subject entry for orphaned grades
+                    if (!subjectData[key]) {
+                        subjectData[key] = {
+                            code: grade.subject_code,
+                            name: grade.subject_name,
+                            credits: 'N/A', // Unknown credits for unenrolled subject
+                            activities: [],
+                            quizzes: [],
+                            exams: [],
+                            isUnenrolled: true // Flag to show differently
+                        };
+                    }
+                    
+                    // Add the grade
+                    const gradeType = grade.grade_type;
+                    if (gradeType === 'activity') {
+                        subjectData[key].activities.push(grade);
+                    } else if (gradeType === 'quiz') {
+                        subjectData[key].quizzes.push(grade);
+                    } else if (gradeType === 'exam') {
+                        subjectData[key].exams.push(grade);
+                    }
+                }
+            });
+        }
         
         const detailsHtml = `
             <div class="student-card">
@@ -308,8 +360,19 @@ async function viewStudentDetails(studentId) {
                 ${Object.keys(subjectData).length > 0 ? `
                     <div class="subjects-grid">
                         ${Object.entries(subjectData).map(([subjectKey, subject]) => `
-                            <div class="subject-card">
-                                <h5>${subjectKey} (${subject.credits} credits)</h5>
+                            <div class="subject-card ${subject.isUnenrolled ? 'unenrolled-subject' : ''}">
+                                <h5>
+                                    ${subjectKey} 
+                                    ${subject.isUnenrolled ? 
+                                        '<span class="unenrolled-badge">Previous Enrollment</span>' : 
+                                        `(${subject.credits} credits)`
+                                    }
+                                </h5>
+                                ${subject.isUnenrolled ? `
+                                    <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                        📚 This student was previously enrolled in this subject. Grades are preserved for record keeping.
+                                    </p>
+                                ` : ''}
                                 <div class="grade-breakdown">
                                     ${subject.activities.length > 0 ? `
                                         <div class="grade-type activity">
@@ -350,18 +413,49 @@ async function viewStudentDetails(studentId) {
                     </div>
                 ` : `
                     <div class="alert alert-info">
-                        <p>This student is not enrolled in any subjects yet.</p>
-                        <p>Click "Back to Students" and then "Manage Enrollments" to enroll them in subjects.</p>
+                        <p><strong>This student is not enrolled in any subjects yet.</strong></p>
+                        <p>To add grades for this student:</p>
+                        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                            <li>Click "Back to Students" below</li>
+                            <li>Click "Manage Enrollments" for this student</li>
+                            <li>Enroll them in the desired subjects</li>
+                            <li>Then go to the "Grades" tab to add grades</li>
+                        </ol>
                     </div>
                 `}
-                <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
+                <div style="margin-top: 1.5rem;">
+                    <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
+                    ${Object.keys(subjectData).length === 0 ? `
+                        <button class="btn btn-success" onclick="manageEnrollments(${student.id})">Manage Enrollments</button>
+                    ` : ''}
+                </div>
             </div>
         `;
         
         document.getElementById('studentsContainer').innerHTML = detailsHtml;
         
     } catch (error) {
-        showAlert('Error loading student details', 'error');
+        console.error('Error loading student details:', error);
+        showAlert('Error loading student details: ' + error.message, 'error');
+        
+        // Show a fallback error message in the container
+        document.getElementById('studentsContainer').innerHTML = `
+            <div class="student-card">
+                <h3>Error Loading Student Details</h3>
+                <div class="alert alert-error">
+                    <p><strong>Unable to load student information.</strong></p>
+                    <p>Error: ${error.message}</p>
+                    <p>Debug information:</p>
+                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Student ID: ${studentId}</li>
+                        <li>Check browser console for more details</li>
+                        <li>Try refreshing the page</li>
+                    </ul>
+                </div>
+                <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
+                <button class="btn btn-primary" onclick="viewStudentDetails(${studentId})" style="margin-left: 0.5rem;">Retry</button>
+            </div>
+        `;
     }
 }
 
@@ -432,40 +526,52 @@ async function loadStudentGrades() {
     }
     
     try {
-        const [student, grades] = await Promise.all([
+        // Get student info and grades
+        const [studentResponse, gradesResponse] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
         ]);
         
-        // Get student's enrollments to show all enrolled subjects, even if no grades yet
-        const studentDetails = await apiRequest(`/students/${studentId}`);
+        const student = studentResponse;
+        const grades = gradesResponse;
         
         // Group grades by subject
         const gradesBySubject = {};
         
         // First, add all enrolled subjects (even without grades)
-        studentDetails.subjects.forEach(subject => {
-            gradesBySubject[subject.code] = {
-                name: subject.name,
-                enrollment_id: subject.enrollment_id,
-                grades: []
-            };
-        });
+        if (student.subjects && student.subjects.length > 0) {
+            student.subjects.forEach(subject => {
+                gradesBySubject[subject.code] = {
+                    name: subject.name,
+                    enrollment_id: subject.enrollment_id,
+                    grades: []
+                };
+            });
+        }
         
         // Then add grades to existing subjects
-        grades.forEach(grade => {
-            const key = grade.subject_code;
-            if (gradesBySubject[key]) {
-                gradesBySubject[key].grades.push(grade);
-            }
-        });
+        if (grades && grades.length > 0) {
+            grades.forEach(grade => {
+                const key = grade.subject_code;
+                if (gradesBySubject[key]) {
+                    gradesBySubject[key].grades.push(grade);
+                }
+            });
+        }
         
         if (Object.keys(gradesBySubject).length === 0) {
             container.innerHTML = `
                 <h3>Grades for ${student.first_name} ${student.last_name}</h3>
                 <div class="alert alert-info">
-                    <p>This student is not enrolled in any subjects yet.</p>
-                    <p>Go to the Students tab and click "Manage Enrollments" to enroll them in subjects first.</p>
+                    <p><strong>This student is not enrolled in any subjects yet.</strong></p>
+                    <p>To add grades for this student:</p>
+                    <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
+                        <li>Go to the "Students" tab</li>
+                        <li>Find "${student.first_name} ${student.last_name}" and click "Manage Enrollments"</li>
+                        <li>Enroll them in the desired subjects</li>
+                        <li>Come back to this "Grades" tab to add grades</li>
+                    </ol>
+                    <button class="btn btn-success" onclick="showTab('students')" style="margin-top: 1rem;">Go to Students Tab</button>
                 </div>
             `;
             return;
@@ -509,7 +615,7 @@ async function loadStudentGrades() {
                         </table>
                     ` : `
                         <p class="text-muted" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
-                            No grades recorded yet for this subject. Click "Add Grade" to start adding grades.
+                            📝 No grades recorded yet for this subject. Click "Add Grade" above to start adding grades.
                         </p>
                     `}
                 </div>
@@ -517,7 +623,14 @@ async function loadStudentGrades() {
         `;
         
     } catch (error) {
-        container.innerHTML = '<p class="alert alert-error">Error loading grades</p>';
+        console.error('Error loading grades:', error);
+        container.innerHTML = `
+            <div class="alert alert-error">
+                <p><strong>Error loading grades</strong></p>
+                <p>${error.message}</p>
+                <p>Please try refreshing the page or contact support if the problem persists.</p>
+            </div>
+        `;
     }
 }
 

@@ -475,3 +475,19 @@ body {
     background: #e9ecef;
     transition: background-color 0.3s ease;
 }
+
+/* Unenrolled subject styling */
+.unenrolled-subject {
+    border-left-color: #ffc107 !important;
+    background: #fff8e1;
+}
+
+.unenrolled-badge {
+    background: #ffc107;
+    color: #212529;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
