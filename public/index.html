@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+   <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="header">
+        <h1>Student Management System</h1>
+    </div>
+
+    <div class="container">
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('dashboard')">Dashboard</button>
+            <button class="nav-tab" onclick="showTab('students')">Students</button>
+            <button class="nav-tab" onclick="showTab('subjects')">Subjects</button>
+            <button class="nav-tab" onclick="showTab('grades')">Grades</button>
+        </div>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <h2>Dashboard</h2>
+            <div class="dashboard-cards">
+                <div class="card">
+                    <h3 id="totalStudents">0</h3>
+                    <p>Total Students</p>
+                </div>
+                <div class="card">
+                    <h3 id="totalSubjects">0</h3>
+                    <p>Total Subjects</p>
+                </div>
+                <div class="card">
+                    <h3 id="totalGrades">0</h3>
+                    <p>Total Grades</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Students Tab -->
+        <div id="students" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>Students</h2>
+                <button class="btn" onclick="showAddStudentModal()">Add Student</button>
+            </div>
+            <div id="studentsContainer" class="loading">Loading students...</div>
+        </div>
+
+        <!-- Subjects Tab -->
+        <div id="subjects" class="tab-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>Subjects</h2>
+                <button class="btn" onclick="showAddSubjectModal()">Add Subject</button>
+            </div>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Credits</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody id="subjectsTable">
+                    <tr><td colspan="4" class="loading">Loading subjects...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Grades Tab -->
+        <div id="grades" class="tab-content">
+            <h2>Grade Management</h2>
+            <div class="form-group">
+                <label for="studentSelect">Select Student:</label>
+                <select id="studentSelect" onchange="loadStudentGrades()">
+                    <option value="">Choose a student...</option>
+                </select>
+            </div>
+            <div id="gradesContainer"></div>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div id="addStudentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Student</h3>
+                <span class="close" onclick="closeModal('addStudentModal')">&times;</span>
+            </div>
+            <form id="addStudentForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName">First Name:</label>
+                        <input type="text" id="firstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name:</label>
+                        <input type="text" id="lastName" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="studentId">Student ID:</label>
+                        <input type="text" id="studentId" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="dateOfBirth">Date of Birth:</label>
+                        <input type="date" id="dateOfBirth">
+                    </div>
+                </div>
+                <button type="submit" class="btn">Add Student</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addStudentModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Subject Modal -->
+    <div id="addSubjectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add New Subject</h3>
+                <span class="close" onclick="closeModal('addSubjectModal')">&times;</span>
+            </div>
+            <form id="addSubjectForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="subjectName">Subject Name:</label>
+                        <input type="text" id="subjectName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subjectCode">Subject Code:</label>
+                        <input type="text" id="subjectCode" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="subjectDescription">Description:</label>
+                    <input type="text" id="subjectDescription">
+                </div>
+                <div class="form-group">
+                    <label for="subjectCredits">Credits:</label>
+                    <input type="number" id="subjectCredits" value="3" min="1" max="6">
+                </div>
+                <button type="submit" class="btn">Add Subject</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addSubjectModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Student Modal -->
+    <div id="editStudentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Student</h3>
+                <span class="close" onclick="closeModal('editStudentModal')">&times;</span>
+            </div>
+            <form id="editStudentForm">
+                <input type="hidden" id="editStudentId">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editFirstName">First Name:</label>
+                        <input type="text" id="editFirstName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editLastName">Last Name:</label>
+                        <input type="text" id="editLastName" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="editEmail">Email:</label>
+                    <input type="email" id="editEmail" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editStudentIdField">Student ID:</label>
+                        <input type="text" id="editStudentIdField" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editDateOfBirth">Date of Birth:</label>
+                        <input type="date" id="editDateOfBirth">
+                    </div>
+                </div>
+                <button type="submit" class="btn">Update Student</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editStudentModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Enrollment Modal -->
+    <div id="enrollmentModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Manage Enrollments</h3>
+                <span class="close" onclick="closeModal('enrollmentModal')">&times;</span>
+            </div>
+            <div id="enrollmentContent">
+                <div class="enrollment-section">
+                    <h4>Current Enrollments</h4>
+                    <div id="currentEnrollments"></div>
+                </div>
+                <div class="enrollment-section">
+                    <h4>Enroll in New Subject</h4>
+                    <div class="form-group">
+                        <label for="availableSubjects">Available Subjects:</label>
+                        <select id="availableSubjects">
+                            <option value="">Select a subject...</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="enrollStudent()">Enroll</button>
+                </div>
+            </div>
+            <input type="hidden" id="enrollmentStudentId">
+        </div>
+    </div>
+
+    <!-- Add Grade Modal -->
+    <div id="addGradeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Grade</h3>
+                <span class="close" onclick="closeModal('addGradeModal')">&times;</span>
+            </div>
+            <form id="addGradeForm">
+                <input type="hidden" id="gradeEnrollmentId">
+                <div class="form-group">
+                    <label for="gradeType">Grade Type:</label>
+                    <select id="gradeType" required>
+                        <option value="">Select type...</option>
+                        <option value="activity">Activity</option>
+                        <option value="quiz">Quiz</option>
+                        <option value="exam">Exam</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="gradeName">Grade Name:</label>
+                    <input type="text" id="gradeName" required placeholder="e.g., Quiz 1, Midterm Exam">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="gradeScore">Score:</label>
+                        <input type="number" id="gradeScore" required min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="gradeMaxScore">Max Score:</label>
+                        <input type="number" id="gradeMaxScore" required min="0" step="0.01" value="100">
+                    </div>
+                </div>
+                <button type="submit" class="btn">Add Grade</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('addGradeModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Grade Modal -->
+    <div id="editGradeModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Edit Grade</h3>
+                <span class="close" onclick="closeModal('editGradeModal')">&times;</span>
+            </div>
+            <form id="editGradeForm">
+                <input type="hidden" id="editGradeId">
+                <div class="form-group">
+                    <label for="editGradeType">Grade Type:</label>
+                    <select id="editGradeType" required>
+                        <option value="">Select type...</option>
+                        <option value="activity">Activity</option>
+                        <option value="quiz">Quiz</option>
+                        <option value="exam">Exam</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editGradeName">Grade Name:</label>
+                    <input type="text" id="editGradeName" required placeholder="e.g., Quiz 1, Midterm Exam">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="editGradeScore">Score:</label>
+                        <input type="number" id="editGradeScore" required min="0" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label for="editGradeMaxScore">Max Score:</label>
+                        <input type="number" id="editGradeMaxScore" required min="0" step="0.01">
+                    </div>
+                </div>
+                <button type="submit" class="btn">Update Grade</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editGradeModal')">Cancel</button>
+            </form>
+        </div>
+    </div>
+    
+    <script src="script.js"></script> 
+</body>
+</html>
