@@ -11,16 +11,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database setup - Use memory database for production (simpler but data doesn't persist)
+// Database setup - Use file-based database for persistence
 const dbPath = process.env.NODE_ENV === 'production' 
-  ? ':memory:'  // In-memory database for production
+  ? './students.db'  // File in current directory for production
   : 'students.db';
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening database:', err.message);
   } else {
-    console.log('Connected to SQLite database:', dbPath === ':memory:' ? 'In-Memory' : dbPath);
+    console.log('Connected to SQLite database:', dbPath);
   }
 });
 
