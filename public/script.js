@@ -1,15 +1,22 @@
-const API_BASE = 'http://localhost:3000/api';
+// Use relative API base for production, localhost for development
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:3000/api' 
+  : '/api';
+
+console.log('API_BASE:', API_BASE);
+console.log('Current hostname:', window.location.hostname);
+
 let currentStudents = [];
 let currentSubjects = [];
 
-
+// Initialize app
 document.addEventListener('DOMContentLoaded', function() {
     loadDashboard();
     loadStudents();
     loadSubjects();
     loadStudentSelect();
     
-
+    // Form submissions
     document.getElementById('addStudentForm').addEventListener('submit', handleAddStudent);
     document.getElementById('editStudentForm').addEventListener('submit', handleEditStudent);
     document.getElementById('addSubjectForm').addEventListener('submit', handleAddSubject);
@@ -17,24 +24,24 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editGradeForm').addEventListener('submit', handleEditGrade);
 });
 
-
+// Tab functionality
 function showTab(tabName) {
-  
+    // Hide all tabs
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    
+    // Remove active class from all nav tabs
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.classList.remove('active');
     });
     
-  
+    // Show selected tab
     document.getElementById(tabName).classList.add('active');
     event.target.classList.add('active');
 }
 
-
+// API functions
 async function apiRequest(endpoint, method = 'GET', data = null) {
     try {
         const config = {
@@ -51,7 +58,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         const response = await fetch(`${API_BASE}${endpoint}`, config);
         
         if (!response.ok) {
-           
+            // Parse the error response to get the specific error message
             const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
@@ -59,12 +66,12 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-       
+        // Don't show generic error here, let the calling function handle it
         throw error;
     }
 }
 
-
+// Dashboard functions
 async function loadDashboard() {
     try {
         const [students, subjects] = await Promise.all([
@@ -72,7 +79,7 @@ async function loadDashboard() {
             apiRequest('/subjects')
         ]);
         
-    
+        // Get total grades count
         let totalGrades = 0;
         for (const student of students) {
             const grades = await apiRequest(`/students/${student.id}/grades`);
@@ -88,7 +95,7 @@ async function loadDashboard() {
     }
 }
 
-
+// Student functions
 async function loadStudents() {
     try {
         const students = await apiRequest('/students');
@@ -136,7 +143,7 @@ async function editStudent(studentId) {
     try {
         const student = await apiRequest(`/students/${studentId}`);
         
-      
+        // Populate the edit form with current student data
         document.getElementById('editStudentId').value = student.id;
         document.getElementById('editFirstName').value = student.first_name;
         document.getElementById('editLastName').value = student.last_name;
@@ -144,7 +151,7 @@ async function editStudent(studentId) {
         document.getElementById('editStudentIdField').value = student.student_id;
         document.getElementById('editDateOfBirth').value = student.date_of_birth || '';
         
-   
+        // Show the edit modal
         document.getElementById('editStudentModal').style.display = 'block';
         
     } catch (error) {
@@ -172,7 +179,7 @@ async function handleEditStudent(e) {
         loadStudentSelect();
         loadDashboard();
     } catch (error) {
-       
+        // Show the specific error message from the server
         showAlert(error.message, 'error');
     }
 }
@@ -186,7 +193,7 @@ async function manageEnrollments(studentId) {
         
         document.getElementById('enrollmentStudentId').value = studentId;
         
-   
+        // Display current enrollments
         const currentEnrollmentsHtml = student.subjects.length > 0 ? 
             student.subjects.map(subject => `
                 <div class="enrollment-item">
@@ -197,7 +204,7 @@ async function manageEnrollments(studentId) {
         
         document.getElementById('currentEnrollments').innerHTML = currentEnrollmentsHtml;
         
-     
+        // Populate available subjects dropdown
         const availableSubjectsSelect = document.getElementById('availableSubjects');
         availableSubjectsSelect.innerHTML = '<option value="">Select a subject...</option>' +
             availableSubjects.map(subject => 
@@ -227,7 +234,7 @@ async function enrollStudent() {
         });
         
         showAlert('Student enrolled successfully', 'success');
-        manageEnrollments(studentId); 
+        manageEnrollments(studentId); // Refresh the enrollment modal
         loadDashboard();
     } catch (error) {
         showAlert(error.message, 'error');
@@ -240,7 +247,7 @@ async function unenrollStudent(enrollmentId) {
             await apiRequest(`/enrollments/${enrollmentId}`, 'DELETE');
             showAlert('Student unenrolled successfully', 'success');
             
-    
+            // Refresh the enrollment modal
             const studentId = document.getElementById('enrollmentStudentId').value;
             manageEnrollments(studentId);
             loadDashboard();
@@ -252,92 +259,36 @@ async function unenrollStudent(enrollmentId) {
 
 async function viewStudentDetails(studentId) {
     try {
-  
-        const [studentResponse, gradesResponse] = await Promise.all([
+        const [student, grades] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
         ]);
         
-        const student = studentResponse;
-        const grades = gradesResponse;
+        // Get student's enrollment details
+        const studentDetails = await apiRequest(`/students/${studentId}`);
         
-        console.log('Student data:', student);
-        console.log('Grades data:', grades);
-        
-        
+        // Group grades by subject, but include all enrolled subjects
         const subjectData = {};
         
-       
-        if (student.subjects && student.subjects.length > 0) {
-            student.subjects.forEach(subject => {
-                const key = `${subject.code} - ${subject.name}`;
-                subjectData[key] = {
-                    code: subject.code,
-                    name: subject.name,
-                    credits: subject.credits,
-                    activities: [],
-                    quizzes: [],
-                    exams: []
-                };
-            });
-        }
+        // First, add all enrolled subjects (even without grades)
+        studentDetails.subjects.forEach(subject => {
+            subjectData[`${subject.code} - ${subject.name}`] = {
+                code: subject.code,
+                name: subject.name,
+                credits: subject.credits,
+                activities: [],
+                quizzes: [],
+                exams: []
+            };
+        });
         
-       
-        if (grades && grades.length > 0) {
-            grades.forEach(grade => {
-                console.log('Processing grade:', grade);
-                
-             
-                const key = `${grade.subject_code} - ${grade.subject_name}`;
-                
-              
-                if (subjectData[key]) {
-                  
-                    const gradeType = grade.grade_type;
-                    let arrayName;
-                    
-                    if (gradeType === 'activity') {
-                        arrayName = 'activities';
-                    } else if (gradeType === 'quiz') {
-                        arrayName = 'quizzes';
-                    } else if (gradeType === 'exam') {
-                        arrayName = 'exams';
-                    } else {
-                        console.warn('Unknown grade type:', gradeType);
-                        return; 
-                    }
-                    
-           
-                    subjectData[key][arrayName].push(grade);
-                } else {
-                 
-                    console.warn('Grade found for unenrolled subject:', key);
-                    
-                  
-                    if (!subjectData[key]) {
-                        subjectData[key] = {
-                            code: grade.subject_code,
-                            name: grade.subject_name,
-                            credits: 'N/A', 
-                            activities: [],
-                            quizzes: [],
-                            exams: [],
-                            isUnenrolled: true 
-                        };
-                    }
-                    
-                    // Add the grade
-                    const gradeType = grade.grade_type;
-                    if (gradeType === 'activity') {
-                        subjectData[key].activities.push(grade);
-                    } else if (gradeType === 'quiz') {
-                        subjectData[key].quizzes.push(grade);
-                    } else if (gradeType === 'exam') {
-                        subjectData[key].exams.push(grade);
-                    }
-                }
-            });
-        }
+        // Then add grades to existing subjects
+        grades.forEach(grade => {
+            const key = `${grade.subject_code} - ${grade.subject_name}`;
+            if (subjectData[key]) {
+                subjectData[key][grade.grade_type + 's'].push(grade);
+            }
+        });
         
         const detailsHtml = `
             <div class="student-card">
@@ -360,19 +311,8 @@ async function viewStudentDetails(studentId) {
                 ${Object.keys(subjectData).length > 0 ? `
                     <div class="subjects-grid">
                         ${Object.entries(subjectData).map(([subjectKey, subject]) => `
-                            <div class="subject-card ${subject.isUnenrolled ? 'unenrolled-subject' : ''}">
-                                <h5>
-                                    ${subjectKey} 
-                                    ${subject.isUnenrolled ? 
-                                        '<span class="unenrolled-badge">Previous Enrollment</span>' : 
-                                        `(${subject.credits} credits)`
-                                    }
-                                </h5>
-                                ${subject.isUnenrolled ? `
-                                    <p class="text-muted" style="font-size: 0.9rem; margin-bottom: 0.5rem;">
-                                        📚 This student was previously enrolled in this subject. Grades are preserved for record keeping.
-                                    </p>
-                                ` : ''}
+                            <div class="subject-card">
+                                <h5>${subjectKey} (${subject.credits} credits)</h5>
                                 <div class="grade-breakdown">
                                     ${subject.activities.length > 0 ? `
                                         <div class="grade-type activity">
@@ -413,49 +353,18 @@ async function viewStudentDetails(studentId) {
                     </div>
                 ` : `
                     <div class="alert alert-info">
-                        <p><strong>This student is not enrolled in any subjects yet.</strong></p>
-                        <p>To add grades for this student:</p>
-                        <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
-                            <li>Click "Back to Students" below</li>
-                            <li>Click "Manage Enrollments" for this student</li>
-                            <li>Enroll them in the desired subjects</li>
-                            <li>Then go to the "Grades" tab to add grades</li>
-                        </ol>
+                        <p>This student is not enrolled in any subjects yet.</p>
+                        <p>Click "Back to Students" and then "Manage Enrollments" to enroll them in subjects.</p>
                     </div>
                 `}
-                <div style="margin-top: 1.5rem;">
-                    <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
-                    ${Object.keys(subjectData).length === 0 ? `
-                        <button class="btn btn-success" onclick="manageEnrollments(${student.id})">Manage Enrollments</button>
-                    ` : ''}
-                </div>
+                <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
             </div>
         `;
         
         document.getElementById('studentsContainer').innerHTML = detailsHtml;
         
     } catch (error) {
-        console.error('Error loading student details:', error);
-        showAlert('Error loading student details: ' + error.message, 'error');
-        
-      
-        document.getElementById('studentsContainer').innerHTML = `
-            <div class="student-card">
-                <h3>Error Loading Student Details</h3>
-                <div class="alert alert-error">
-                    <p><strong>Unable to load student information.</strong></p>
-                    <p>Error: ${error.message}</p>
-                    <p>Debug information:</p>
-                    <ul style="margin-left: 1.5rem; margin-top: 0.5rem;">
-                        <li>Student ID: ${studentId}</li>
-                        <li>Check browser console for more details</li>
-                        <li>Try refreshing the page</li>
-                    </ul>
-                </div>
-                <button class="btn btn-secondary" onclick="loadStudents()">Back to Students</button>
-                <button class="btn btn-primary" onclick="viewStudentDetails(${studentId})" style="margin-left: 0.5rem;">Retry</button>
-            </div>
-        `;
+        showAlert('Error loading student details', 'error');
     }
 }
 
@@ -472,7 +381,7 @@ async function deleteStudent(studentId) {
     }
 }
 
-
+// Subject functions
 async function loadSubjects() {
     try {
         const subjects = await apiRequest('/subjects');
@@ -501,7 +410,7 @@ function displaySubjects(subjects) {
     `).join('');
 }
 
-
+// Grade functions
 async function loadStudentSelect() {
     try {
         const students = await apiRequest('/students');
@@ -526,52 +435,40 @@ async function loadStudentGrades() {
     }
     
     try {
-    
-        const [studentResponse, gradesResponse] = await Promise.all([
+        const [student, grades] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
         ]);
         
-        const student = studentResponse;
-        const grades = gradesResponse;
+        // Get student's enrollments to show all enrolled subjects, even if no grades yet
+        const studentDetails = await apiRequest(`/students/${studentId}`);
         
- 
+        // Group grades by subject
         const gradesBySubject = {};
         
+        // First, add all enrolled subjects (even without grades)
+        studentDetails.subjects.forEach(subject => {
+            gradesBySubject[subject.code] = {
+                name: subject.name,
+                enrollment_id: subject.enrollment_id,
+                grades: []
+            };
+        });
         
-        if (student.subjects && student.subjects.length > 0) {
-            student.subjects.forEach(subject => {
-                gradesBySubject[subject.code] = {
-                    name: subject.name,
-                    enrollment_id: subject.enrollment_id,
-                    grades: []
-                };
-            });
-        }
-        
-     
-        if (grades && grades.length > 0) {
-            grades.forEach(grade => {
-                const key = grade.subject_code;
-                if (gradesBySubject[key]) {
-                    gradesBySubject[key].grades.push(grade);
-                }
-            });
-        }
+        // Then add grades to existing subjects
+        grades.forEach(grade => {
+            const key = grade.subject_code;
+            if (gradesBySubject[key]) {
+                gradesBySubject[key].grades.push(grade);
+            }
+        });
         
         if (Object.keys(gradesBySubject).length === 0) {
             container.innerHTML = `
                 <h3>Grades for ${student.first_name} ${student.last_name}</h3>
                 <div class="alert alert-info">
-                    <p><strong>This student is not enrolled in any subjects yet.</strong></p>
-                    <p>To add grades for this student:</p>
-                    <ol style="margin-left: 1.5rem; margin-top: 0.5rem;">
-                        <li>Go to the "Students" tab</li>
-                        <li>Find "${student.first_name} ${student.last_name}" and click "Manage Enrollments"</li>
-                        <li>Enroll them in the desired subjects</li>
-                        <li>Come back to this "Grades" tab to add grades</li>
-                    </ol>
-                    <button class="btn btn-success" onclick="showTab('students')" style="margin-top: 1rem;">Go to Students Tab</button>
+                    <p>This student is not enrolled in any subjects yet.</p>
+                    <p>Go to the Students tab and click "Manage Enrollments" to enroll them in subjects first.</p>
                 </div>
             `;
             return;
@@ -615,7 +512,7 @@ async function loadStudentGrades() {
                         </table>
                     ` : `
                         <p class="text-muted" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
-                            📝 No grades recorded yet for this subject. Click "Add Grade" above to start adding grades.
+                            No grades recorded yet for this subject. Click "Add Grade" to start adding grades.
                         </p>
                     `}
                 </div>
@@ -623,20 +520,13 @@ async function loadStudentGrades() {
         `;
         
     } catch (error) {
-        console.error('Error loading grades:', error);
-        container.innerHTML = `
-            <div class="alert alert-error">
-                <p><strong>Error loading grades</strong></p>
-                <p>${error.message}</p>
-                <p>Please try refreshing the page or contact support if the problem persists.</p>
-            </div>
-        `;
+        container.innerHTML = '<p class="alert alert-error">Error loading grades</p>';
     }
 }
 
 async function editGrade(gradeId) {
     try {
-       
+        // Get grade details by finding it in the current data
         const studentId = document.getElementById('studentSelect').value;
         const grades = await apiRequest(`/students/${studentId}/grades`);
         const grade = grades.find(g => g.id === gradeId);
@@ -646,7 +536,7 @@ async function editGrade(gradeId) {
             return;
         }
         
-       
+        // Populate edit form
         document.getElementById('editGradeId').value = grade.id;
         document.getElementById('editGradeType').value = grade.grade_type;
         document.getElementById('editGradeName').value = grade.grade_name;
@@ -695,7 +585,7 @@ async function deleteGrade(gradeId) {
     }
 }
 
-
+// Modal functions
 function showAddStudentModal() {
     document.getElementById('addStudentModal').style.display = 'block';
 }
@@ -711,11 +601,11 @@ function showAddGradeModal(enrollmentId) {
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
-   
+    // Reset forms
     document.querySelectorAll(`#${modalId} form`).forEach(form => form.reset());
 }
 
-
+// Form handlers
 async function handleAddStudent(e) {
     e.preventDefault();
     
@@ -735,7 +625,7 @@ async function handleAddStudent(e) {
         loadStudentSelect();
         loadDashboard();
     } catch (error) {
-        
+        // Show the specific error message from the server
         showAlert(error.message, 'error');
     }
 }
@@ -783,23 +673,23 @@ async function handleAddGrade(e) {
     }
 }
 
-
+// Utility functions
 function showAlert(message, type) {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type}`;
     alertDiv.textContent = message;
     
-   
+    // Insert at the top of the container
     const container = document.querySelector('.container');
     container.insertBefore(alertDiv, container.firstChild);
     
-
+    // Remove after 5 seconds
     setTimeout(() => {
         alertDiv.remove();
     }, 5000);
 }
 
-
+// Close modal when clicking outside
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
         event.target.style.display = 'none';
