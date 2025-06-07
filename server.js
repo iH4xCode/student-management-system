@@ -6,30 +6,29 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-
+// Database setup - Use memory database for production (simpler but data doesn't persist)
 const dbPath = process.env.NODE_ENV === 'production' 
-  ? path.join(__dirname, 'data', 'students.db')
+  ? ':memory:'  // In-memory database for production
   : 'students.db';
 
-
-if (process.env.NODE_ENV === 'production') {
-  const fs = require('fs');
-  const dataDir = path.join(__dirname, 'data');
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true });
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Error opening database:', err.message);
+  } else {
+    console.log('Connected to SQLite database:', dbPath === ':memory:' ? 'In-Memory' : dbPath);
   }
-}
+});
 
-const db = new sqlite3.Database(dbPath);
-
-
+// Initialize database tables
 db.serialize(() => {
-
+  console.log('Initializing database tables...');
+  
+  // Students table
   db.run(`CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     first_name TEXT NOT NULL,
@@ -38,18 +37,24 @@ db.serialize(() => {
     student_id TEXT UNIQUE NOT NULL,
     date_of_birth DATE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating students table:', err);
+    else console.log('Students table ready');
+  });
 
-
+  // Subjects table
   db.run(`CREATE TABLE IF NOT EXISTS subjects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     code TEXT UNIQUE NOT NULL,
     description TEXT,
     credits INTEGER DEFAULT 3
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating subjects table:', err);
+    else console.log('Subjects table ready');
+  });
 
- 
+  // Student-Subject enrollment table
   db.run(`CREATE TABLE IF NOT EXISTS enrollments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,
@@ -58,9 +63,12 @@ db.serialize(() => {
     FOREIGN KEY (student_id) REFERENCES students (id),
     FOREIGN KEY (subject_id) REFERENCES subjects (id),
     UNIQUE(student_id, subject_id)
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating enrollments table:', err);
+    else console.log('Enrollments table ready');
+  });
 
-
+  // Grades table
   db.run(`CREATE TABLE IF NOT EXISTS grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     enrollment_id INTEGER,
@@ -70,14 +78,19 @@ db.serialize(() => {
     max_score REAL NOT NULL,
     date_recorded DATE DEFAULT CURRENT_DATE,
     FOREIGN KEY (enrollment_id) REFERENCES enrollments (id)
-  )`);
+  )`, (err) => {
+    if (err) console.error('Error creating grades table:', err);
+    else console.log('Grades table ready');
+  });
 
-
+  // Insert sample data only if tables are empty
   db.get("SELECT COUNT(*) as count FROM students", (err, row) => {
     if (err) {
       console.error('Error checking students table:', err);
       return;
     }
+    
+    console.log('Current student count:', row.count);
     
     if (row.count === 0) {
       console.log('Inserting sample data...');
@@ -85,18 +98,27 @@ db.serialize(() => {
       db.run(`INSERT INTO students (first_name, last_name, email, student_id, date_of_birth) VALUES
         ('John', 'Doe', 'john.doe@email.com', 'STU001', '2000-05-15'),
         ('Jane', 'Smith', 'jane.smith@email.com', 'STU002', '2001-03-22'),
-        ('Mike', 'Johnson', 'mike.johnson@email.com', 'STU003', '1999-11-08')`);
+        ('Mike', 'Johnson', 'mike.johnson@email.com', 'STU003', '1999-11-08')`, (err) => {
+        if (err) console.error('Error inserting students:', err);
+        else console.log('Sample students inserted');
+      });
 
       db.run(`INSERT INTO subjects (name, code, description, credits) VALUES
         ('Mathematics', 'MATH101', 'Basic Mathematics', 3),
         ('Physics', 'PHYS101', 'Introduction to Physics', 4),
         ('Chemistry', 'CHEM101', 'General Chemistry', 3),
-        ('Computer Science', 'CS101', 'Programming Fundamentals', 4)`);
+        ('Computer Science', 'CS101', 'Programming Fundamentals', 4)`, (err) => {
+        if (err) console.error('Error inserting subjects:', err);
+        else console.log('Sample subjects inserted');
+      });
 
       db.run(`INSERT INTO enrollments (student_id, subject_id) VALUES
         (1, 1), (1, 2), (1, 4),
         (2, 1), (2, 3), (2, 4),
-        (3, 2), (3, 3), (3, 4)`);
+        (3, 2), (3, 3), (3, 4)`, (err) => {
+        if (err) console.error('Error inserting enrollments:', err);
+        else console.log('Sample enrollments inserted');
+      });
 
       db.run(`INSERT INTO grades (enrollment_id, grade_type, grade_name, score, max_score) VALUES
         (1, 'activity', 'Activity 1', 85, 100),
@@ -106,30 +128,43 @@ db.serialize(() => {
         (2, 'quiz', 'Quiz 1', 95, 100),
         (3, 'activity', 'Assignment 1', 90, 100),
         (4, 'quiz', 'Quiz 1', 87, 100),
-        (5, 'activity', 'Lab Report', 92, 100)`);
+        (5, 'activity', 'Lab Report', 92, 100)`, (err) => {
+        if (err) console.error('Error inserting grades:', err);
+        else console.log('Sample grades inserted');
+      });
+    } else {
+      console.log('Database already has data, skipping sample data insertion');
     }
   });
 });
 
-
+// Serve the main HTML file for root route
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// STUDENT ENDPOINTS
 
-
-
+// GET all students
 app.get('/api/students', (req, res) => {
+  console.log('GET /api/students called');
+  
   db.all(`SELECT * FROM students ORDER BY last_name, first_name`, (err, rows) => {
     if (err) {
-      res.status(500).json({ error: err.message });
+      console.error('Database error in GET /api/students:', err);
+      res.status(500).json({ 
+        error: err.message,
+        details: 'Failed to fetch students from database'
+      });
       return;
     }
+    
+    console.log(`Found ${rows.length} students`);
     res.json(rows);
   });
 });
 
-
+// GET student by ID with subjects and grades
 app.get('/api/students/:id', (req, res) => {
   const studentId = req.params.id;
   
@@ -185,7 +220,7 @@ app.get('/api/students/:id', (req, res) => {
   });
 });
 
-
+// GET available subjects for student enrollment
 app.get('/api/students/:id/available-subjects', (req, res) => {
   const studentId = req.params.id;
   
@@ -206,7 +241,7 @@ app.get('/api/students/:id/available-subjects', (req, res) => {
   });
 });
 
-
+// POST create new student
 app.post('/api/students', (req, res) => {
   const { first_name, last_name, email, student_id, date_of_birth } = req.body;
   
@@ -214,7 +249,8 @@ app.post('/api/students', (req, res) => {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
-
+  
+  // Check if student_id or email already exists
   db.get('SELECT id FROM students WHERE student_id = ? OR email = ?', [student_id, email], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -288,7 +324,7 @@ app.put('/api/students/:id', (req, res) => {
       return;
     }
     
-
+    // If no duplicates, proceed with update
     const query = `UPDATE students SET first_name = ?, last_name = ?, email = ?, 
                    student_id = ?, date_of_birth = ? WHERE id = ?`;
     
@@ -365,7 +401,7 @@ app.post('/api/enrollments', (req, res) => {
     return;
   }
   
-
+  // Check if enrollment already exists
   db.get('SELECT id FROM enrollments WHERE student_id = ? AND subject_id = ?', 
     [student_id, subject_id], (err, row) => {
     if (err) {
@@ -418,7 +454,7 @@ app.delete('/api/enrollments/:id', (req, res) => {
   });
 });
 
-
+// GRADES ENDPOINTS
 
 // GET grades for enrollment
 app.get('/api/enrollments/:enrollmentId/grades', (req, res) => {
@@ -522,7 +558,7 @@ app.delete('/api/grades/:id', (req, res) => {
   });
 });
 
-
+// GET detailed grades for a student
 app.get('/api/students/:id/grades', (req, res) => {
   const studentId = req.params.id;
   
@@ -548,18 +584,49 @@ app.get('/api/students/:id/grades', (req, res) => {
   });
 });
 
-
+// Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    database: dbPath
+  });
 });
 
+// Debug endpoint to test database
+app.get('/debug', (req, res) => {
+  db.get("SELECT COUNT(*) as student_count FROM students", (err, studentRow) => {
+    if (err) {
+      res.status(500).json({ error: 'Database error', details: err.message });
+      return;
+    }
+    
+    db.get("SELECT COUNT(*) as subject_count FROM subjects", (err, subjectRow) => {
+      if (err) {
+        res.status(500).json({ error: 'Database error', details: err.message });
+        return;
+      }
+      
+      res.json({
+        status: 'Database OK',
+        students: studentRow.student_count,
+        subjects: subjectRow.subject_count,
+        database_path: dbPath,
+        environment: process.env.NODE_ENV || 'development',
+        timestamp: new Date().toISOString()
+      });
+    });
+  });
+});
 
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-
+// Graceful shutdown
 process.on('SIGINT', () => {
   console.log('Shutting down gracefully...');
   db.close((err) => {
