@@ -2,21 +2,6 @@
 
 A comprehensive web-based student management system with enrollment tracking, grade management, and intuitive dashboard. Built with modern web technologies for educational institutions.
 
-## 📸 Preview
-
-```
-📊 Dashboard  |  👥 Students  |  📚 Subjects  |  📝 Grades
-```
-
-### ✨ Key Features
-- 🎯 **Student Management** - Add, edit, view, and delete student records
-- 📚 **Subject Management** - Create and organize academic subjects
-- 🔄 **Enrollment System** - Flexible student-subject enrollment
-- 📊 **Grade Tracking** - Activities, quizzes, and exams with percentage calculations
-- 📱 **Responsive Design** - Works on desktop, tablet, and mobile
-- 🎨 **Modern UI** - Clean, intuitive interface with smooth animations
-
----
 
 ## 🚀 Quick Start
 
