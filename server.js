@@ -6,17 +6,17 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Database setup - Use persistent storage for production
+
 const dbPath = process.env.NODE_ENV === 'production' 
   ? path.join(__dirname, 'data', 'students.db')
   : 'students.db';
 
-// Ensure data directory exists for production
+
 if (process.env.NODE_ENV === 'production') {
   const fs = require('fs');
   const dataDir = path.join(__dirname, 'data');
@@ -27,9 +27,9 @@ if (process.env.NODE_ENV === 'production') {
 
 const db = new sqlite3.Database(dbPath);
 
-// Initialize database tables
+
 db.serialize(() => {
-  // Students table
+
   db.run(`CREATE TABLE IF NOT EXISTS students (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     first_name TEXT NOT NULL,
@@ -40,7 +40,7 @@ db.serialize(() => {
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
 
-  // Subjects table
+
   db.run(`CREATE TABLE IF NOT EXISTS subjects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -49,7 +49,7 @@ db.serialize(() => {
     credits INTEGER DEFAULT 3
   )`);
 
-  // Student-Subject enrollment table
+ 
   db.run(`CREATE TABLE IF NOT EXISTS enrollments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER,
@@ -60,7 +60,7 @@ db.serialize(() => {
     UNIQUE(student_id, subject_id)
   )`);
 
-  // Grades table
+
   db.run(`CREATE TABLE IF NOT EXISTS grades (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     enrollment_id INTEGER,
@@ -72,7 +72,7 @@ db.serialize(() => {
     FOREIGN KEY (enrollment_id) REFERENCES enrollments (id)
   )`);
 
-  // Insert sample data only if tables are empty
+
   db.get("SELECT COUNT(*) as count FROM students", (err, row) => {
     if (err) {
       console.error('Error checking students table:', err);
@@ -111,14 +111,14 @@ db.serialize(() => {
   });
 });
 
-// Serve the main HTML file for root route
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// STUDENT ENDPOINTS
 
-// GET all students
+
+
 app.get('/api/students', (req, res) => {
   db.all(`SELECT * FROM students ORDER BY last_name, first_name`, (err, rows) => {
     if (err) {
@@ -129,7 +129,7 @@ app.get('/api/students', (req, res) => {
   });
 });
 
-// GET student by ID with subjects and grades
+
 app.get('/api/students/:id', (req, res) => {
   const studentId = req.params.id;
   
@@ -185,7 +185,7 @@ app.get('/api/students/:id', (req, res) => {
   });
 });
 
-// GET available subjects for student enrollment
+
 app.get('/api/students/:id/available-subjects', (req, res) => {
   const studentId = req.params.id;
   
@@ -206,7 +206,7 @@ app.get('/api/students/:id/available-subjects', (req, res) => {
   });
 });
 
-// POST create new student
+
 app.post('/api/students', (req, res) => {
   const { first_name, last_name, email, student_id, date_of_birth } = req.body;
   
@@ -214,8 +214,7 @@ app.post('/api/students', (req, res) => {
     res.status(400).json({ error: 'Missing required fields' });
     return;
   }
-  
-  // Check if student_id or email already exists
+
   db.get('SELECT id FROM students WHERE student_id = ? OR email = ?', [student_id, email], (err, row) => {
     if (err) {
       res.status(500).json({ error: err.message });
@@ -289,7 +288,7 @@ app.put('/api/students/:id', (req, res) => {
       return;
     }
     
-    // If no duplicates, proceed with update
+
     const query = `UPDATE students SET first_name = ?, last_name = ?, email = ?, 
                    student_id = ?, date_of_birth = ? WHERE id = ?`;
     
@@ -366,7 +365,7 @@ app.post('/api/enrollments', (req, res) => {
     return;
   }
   
-  // Check if enrollment already exists
+
   db.get('SELECT id FROM enrollments WHERE student_id = ? AND subject_id = ?', 
     [student_id, subject_id], (err, row) => {
     if (err) {
@@ -419,7 +418,7 @@ app.delete('/api/enrollments/:id', (req, res) => {
   });
 });
 
-// GRADES ENDPOINTS
+
 
 // GET grades for enrollment
 app.get('/api/enrollments/:enrollmentId/grades', (req, res) => {
@@ -523,7 +522,7 @@ app.delete('/api/grades/:id', (req, res) => {
   });
 });
 
-// GET detailed grades for a student
+
 app.get('/api/students/:id/grades', (req, res) => {
   const studentId = req.params.id;
   
@@ -549,18 +548,18 @@ app.get('/api/students/:id/grades', (req, res) => {
   });
 });
 
-// Health check endpoint
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Start server
+
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
 
-// Graceful shutdown
+
 process.on('SIGINT', () => {
   console.log('Shutting down gracefully...');
   db.close((err) => {

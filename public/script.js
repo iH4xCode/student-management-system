@@ -2,14 +2,14 @@ const API_BASE = 'http://localhost:3000/api';
 let currentStudents = [];
 let currentSubjects = [];
 
-// Initialize app
+
 document.addEventListener('DOMContentLoaded', function() {
     loadDashboard();
     loadStudents();
     loadSubjects();
     loadStudentSelect();
     
-    // Form submissions
+
     document.getElementById('addStudentForm').addEventListener('submit', handleAddStudent);
     document.getElementById('editStudentForm').addEventListener('submit', handleEditStudent);
     document.getElementById('addSubjectForm').addEventListener('submit', handleAddSubject);
@@ -17,24 +17,24 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('editGradeForm').addEventListener('submit', handleEditGrade);
 });
 
-// Tab functionality
+
 function showTab(tabName) {
-    // Hide all tabs
+  
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    // Remove active class from all nav tabs
+    
     document.querySelectorAll('.nav-tab').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    // Show selected tab
+  
     document.getElementById(tabName).classList.add('active');
     event.target.classList.add('active');
 }
 
-// API functions
+
 async function apiRequest(endpoint, method = 'GET', data = null) {
     try {
         const config = {
@@ -51,7 +51,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         const response = await fetch(`${API_BASE}${endpoint}`, config);
         
         if (!response.ok) {
-            // Parse the error response to get the specific error message
+           
             const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
             throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
         }
@@ -59,12 +59,12 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
         return await response.json();
     } catch (error) {
         console.error('API Error:', error);
-        // Don't show generic error here, let the calling function handle it
+       
         throw error;
     }
 }
 
-// Dashboard functions
+
 async function loadDashboard() {
     try {
         const [students, subjects] = await Promise.all([
@@ -72,7 +72,7 @@ async function loadDashboard() {
             apiRequest('/subjects')
         ]);
         
-        // Get total grades count
+    
         let totalGrades = 0;
         for (const student of students) {
             const grades = await apiRequest(`/students/${student.id}/grades`);
@@ -88,7 +88,7 @@ async function loadDashboard() {
     }
 }
 
-// Student functions
+
 async function loadStudents() {
     try {
         const students = await apiRequest('/students');
@@ -136,7 +136,7 @@ async function editStudent(studentId) {
     try {
         const student = await apiRequest(`/students/${studentId}`);
         
-        // Populate the edit form with current student data
+      
         document.getElementById('editStudentId').value = student.id;
         document.getElementById('editFirstName').value = student.first_name;
         document.getElementById('editLastName').value = student.last_name;
@@ -144,7 +144,7 @@ async function editStudent(studentId) {
         document.getElementById('editStudentIdField').value = student.student_id;
         document.getElementById('editDateOfBirth').value = student.date_of_birth || '';
         
-        // Show the edit modal
+   
         document.getElementById('editStudentModal').style.display = 'block';
         
     } catch (error) {
@@ -172,7 +172,7 @@ async function handleEditStudent(e) {
         loadStudentSelect();
         loadDashboard();
     } catch (error) {
-        // Show the specific error message from the server
+       
         showAlert(error.message, 'error');
     }
 }
@@ -186,7 +186,7 @@ async function manageEnrollments(studentId) {
         
         document.getElementById('enrollmentStudentId').value = studentId;
         
-        // Display current enrollments
+   
         const currentEnrollmentsHtml = student.subjects.length > 0 ? 
             student.subjects.map(subject => `
                 <div class="enrollment-item">
@@ -197,7 +197,7 @@ async function manageEnrollments(studentId) {
         
         document.getElementById('currentEnrollments').innerHTML = currentEnrollmentsHtml;
         
-        // Populate available subjects dropdown
+     
         const availableSubjectsSelect = document.getElementById('availableSubjects');
         availableSubjectsSelect.innerHTML = '<option value="">Select a subject...</option>' +
             availableSubjects.map(subject => 
@@ -227,7 +227,7 @@ async function enrollStudent() {
         });
         
         showAlert('Student enrolled successfully', 'success');
-        manageEnrollments(studentId); // Refresh the enrollment modal
+        manageEnrollments(studentId); 
         loadDashboard();
     } catch (error) {
         showAlert(error.message, 'error');
@@ -240,7 +240,7 @@ async function unenrollStudent(enrollmentId) {
             await apiRequest(`/enrollments/${enrollmentId}`, 'DELETE');
             showAlert('Student unenrolled successfully', 'success');
             
-            // Refresh the enrollment modal
+    
             const studentId = document.getElementById('enrollmentStudentId').value;
             manageEnrollments(studentId);
             loadDashboard();
@@ -252,7 +252,7 @@ async function unenrollStudent(enrollmentId) {
 
 async function viewStudentDetails(studentId) {
     try {
-        // Get student basic info and grades
+  
         const [studentResponse, gradesResponse] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
@@ -264,10 +264,10 @@ async function viewStudentDetails(studentId) {
         console.log('Student data:', student);
         console.log('Grades data:', grades);
         
-        // Group grades by subject, but include all enrolled subjects
+        
         const subjectData = {};
         
-        // First, add all enrolled subjects (even without grades)
+       
         if (student.subjects && student.subjects.length > 0) {
             student.subjects.forEach(subject => {
                 const key = `${subject.code} - ${subject.name}`;
@@ -282,17 +282,17 @@ async function viewStudentDetails(studentId) {
             });
         }
         
-        // Then add grades to existing subjects
+       
         if (grades && grades.length > 0) {
             grades.forEach(grade => {
                 console.log('Processing grade:', grade);
                 
-                // Build the key exactly as we did above
+             
                 const key = `${grade.subject_code} - ${grade.subject_name}`;
                 
-                // Check if this subject exists in our enrolled subjects
+              
                 if (subjectData[key]) {
-                    // Validate grade_type and build array name
+                  
                     const gradeType = grade.grade_type;
                     let arrayName;
                     
@@ -304,25 +304,25 @@ async function viewStudentDetails(studentId) {
                         arrayName = 'exams';
                     } else {
                         console.warn('Unknown grade type:', gradeType);
-                        return; // Skip this grade
+                        return; 
                     }
                     
-                    // Add grade to the appropriate array
+           
                     subjectData[key][arrayName].push(grade);
                 } else {
-                    // Grade exists for a subject the student is no longer enrolled in
+                 
                     console.warn('Grade found for unenrolled subject:', key);
                     
-                    // Create subject entry for orphaned grades
+                  
                     if (!subjectData[key]) {
                         subjectData[key] = {
                             code: grade.subject_code,
                             name: grade.subject_name,
-                            credits: 'N/A', // Unknown credits for unenrolled subject
+                            credits: 'N/A', 
                             activities: [],
                             quizzes: [],
                             exams: [],
-                            isUnenrolled: true // Flag to show differently
+                            isUnenrolled: true 
                         };
                     }
                     
@@ -438,7 +438,7 @@ async function viewStudentDetails(studentId) {
         console.error('Error loading student details:', error);
         showAlert('Error loading student details: ' + error.message, 'error');
         
-        // Show a fallback error message in the container
+      
         document.getElementById('studentsContainer').innerHTML = `
             <div class="student-card">
                 <h3>Error Loading Student Details</h3>
@@ -472,7 +472,7 @@ async function deleteStudent(studentId) {
     }
 }
 
-// Subject functions
+
 async function loadSubjects() {
     try {
         const subjects = await apiRequest('/subjects');
@@ -501,7 +501,7 @@ function displaySubjects(subjects) {
     `).join('');
 }
 
-// Grade functions
+
 async function loadStudentSelect() {
     try {
         const students = await apiRequest('/students');
@@ -526,7 +526,7 @@ async function loadStudentGrades() {
     }
     
     try {
-        // Get student info and grades
+    
         const [studentResponse, gradesResponse] = await Promise.all([
             apiRequest(`/students/${studentId}`),
             apiRequest(`/students/${studentId}/grades`)
@@ -535,10 +535,10 @@ async function loadStudentGrades() {
         const student = studentResponse;
         const grades = gradesResponse;
         
-        // Group grades by subject
+ 
         const gradesBySubject = {};
         
-        // First, add all enrolled subjects (even without grades)
+        
         if (student.subjects && student.subjects.length > 0) {
             student.subjects.forEach(subject => {
                 gradesBySubject[subject.code] = {
@@ -549,7 +549,7 @@ async function loadStudentGrades() {
             });
         }
         
-        // Then add grades to existing subjects
+     
         if (grades && grades.length > 0) {
             grades.forEach(grade => {
                 const key = grade.subject_code;
@@ -636,7 +636,7 @@ async function loadStudentGrades() {
 
 async function editGrade(gradeId) {
     try {
-        // Get grade details by finding it in the current data
+       
         const studentId = document.getElementById('studentSelect').value;
         const grades = await apiRequest(`/students/${studentId}/grades`);
         const grade = grades.find(g => g.id === gradeId);
@@ -646,7 +646,7 @@ async function editGrade(gradeId) {
             return;
         }
         
-        // Populate edit form
+       
         document.getElementById('editGradeId').value = grade.id;
         document.getElementById('editGradeType').value = grade.grade_type;
         document.getElementById('editGradeName').value = grade.grade_name;
@@ -695,7 +695,7 @@ async function deleteGrade(gradeId) {
     }
 }
 
-// Modal functions
+
 function showAddStudentModal() {
     document.getElementById('addStudentModal').style.display = 'block';
 }
@@ -711,11 +711,11 @@ function showAddGradeModal(enrollmentId) {
 
 function closeModal(modalId) {
     document.getElementById(modalId).style.display = 'none';
-    // Reset forms
+   
     document.querySelectorAll(`#${modalId} form`).forEach(form => form.reset());
 }
 
-// Form handlers
+
 async function handleAddStudent(e) {
     e.preventDefault();
     
@@ -735,7 +735,7 @@ async function handleAddStudent(e) {
         loadStudentSelect();
         loadDashboard();
     } catch (error) {
-        // Show the specific error message from the server
+        
         showAlert(error.message, 'error');
     }
 }
@@ -783,23 +783,23 @@ async function handleAddGrade(e) {
     }
 }
 
-// Utility functions
+
 function showAlert(message, type) {
     const alertDiv = document.createElement('div');
     alertDiv.className = `alert alert-${type}`;
     alertDiv.textContent = message;
     
-    // Insert at the top of the container
+   
     const container = document.querySelector('.container');
     container.insertBefore(alertDiv, container.firstChild);
     
-    // Remove after 5 seconds
+
     setTimeout(() => {
         alertDiv.remove();
     }, 5000);
 }
 
-// Close modal when clicking outside
+
 window.onclick = function(event) {
     if (event.target.classList.contains('modal')) {
         event.target.style.display = 'none';
